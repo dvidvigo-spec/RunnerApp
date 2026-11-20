@@ -1,0 +1,717 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>RunnerApp</title>
+<meta name="theme-color" content="#0c1411">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
+<style>
+:root{
+  --bg:#0c1411; --bg2:#121d19; --card:#17241f; --line:#24362f; --txt:#e8f0ec; --mut:#8ea69b;
+  --acc:#2fd38a; --acc2:#1fa56b; --red:#ff5d6c; --gold:#f2c14e; --r:14px;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{background:var(--bg);color:var(--txt);font-family:Inter,system-ui,sans-serif;font-size:15px;-webkit-font-smoothing:antialiased}
+body{min-height:100vh;padding-bottom:env(safe-area-inset-bottom)}
+.num,.mono{font-family:"JetBrains Mono",ui-monospace,monospace;font-variant-numeric:tabular-nums}
+.pos{color:var(--acc)} .neg{color:var(--red)} .mut{color:var(--mut)}
+button{font:inherit;cursor:pointer;border:0;border-radius:10px}
+input,select{font:inherit;color:var(--txt);background:var(--bg2);border:1px solid var(--line);border-radius:10px;padding:11px 12px;width:100%}
+input:focus,select:focus{outline:2px solid var(--acc2);border-color:transparent}
+label{display:block;font-size:13px;color:var(--mut);margin:12px 0 6px}
+.btn{background:var(--acc);color:#04110b;font-weight:700;padding:12px 16px;width:100%}
+.btn:disabled{opacity:.5}
+.btn.ghost{background:transparent;color:var(--txt);border:1px solid var(--line)}
+.btn.sm{width:auto;padding:8px 12px;font-size:13px}
+.btn.warn{background:var(--gold)}
+.wrap{max-width:980px;margin:0 auto;padding:16px}
+.hidden{display:none!important}
+/* auth */
+.auth{min-height:100vh;display:grid;place-items:center;padding:20px}
+.auth .box{width:100%;max-width:380px}
+.logo{display:flex;align-items:center;gap:10px;font-weight:800;font-size:26px;letter-spacing:-.5px}
+.logo .chip{width:34px;height:34px;border-radius:50%;background:conic-gradient(var(--acc) 0 25%,#0c1411 0 37.5%,var(--acc) 0 62.5%,#0c1411 0 75%,var(--acc) 0);display:grid;place-items:center}
+.logo .chip::after{content:"";width:20px;height:20px;border-radius:50%;background:var(--acc2);border:2px solid #0c1411}
+.sub{color:var(--mut);margin:8px 0 22px;line-height:1.45}
+.err{color:var(--red);font-size:13px;margin-top:10px;min-height:18px}
+.ok{color:var(--acc);font-size:13px;margin-top:10px}
+.link{background:none;color:var(--acc);padding:0;font-size:14px;margin-top:14px}
+/* header */
+header{position:sticky;top:0;z-index:5;background:rgba(12,20,17,.92);backdrop-filter:blur(10px);border-bottom:1px solid var(--line)}
+header .wrap{display:flex;align-items:center;gap:10px;padding:12px 16px}
+header .logo{font-size:19px} header .logo .chip{width:26px;height:26px} header .logo .chip::after{width:14px;height:14px}
+header .sp{flex:1}
+#verJugador{width:auto;max-width:170px;padding:7px 10px;font-size:13px}
+.tabs{display:flex;gap:6px;overflow-x:auto;padding:0 16px 10px;max-width:980px;margin:0 auto;scrollbar-width:none}
+.tabs button{background:var(--bg2);color:var(--mut);padding:8px 14px;font-weight:600;font-size:14px;white-space:nowrap;border:1px solid var(--line)}
+.tabs button.on{background:var(--acc);color:#04110b;border-color:var(--acc)}
+/* cards */
+.grid{display:grid;grid-template-columns:repeat(2,1fr);gap:10px}
+@media(min-width:720px){.grid{grid-template-columns:repeat(3,1fr)}}
+.card{background:var(--card);border:1px solid var(--line);border-radius:var(--r);padding:14px}
+.kpi .l{font-size:12px;color:var(--mut);text-transform:uppercase;letter-spacing:.06em}
+.kpi .v{font-size:22px;font-weight:700;margin-top:6px}
+.kpi .s{font-size:12px;color:var(--mut);margin-top:4px}
+h2{font-size:17px;margin:22px 0 10px}
+h3{font-size:14px;color:var(--mut);margin:18px 0 8px;text-transform:uppercase;letter-spacing:.06em}
+.upload{border:2px dashed var(--line);border-radius:var(--r);padding:18px;text-align:center;margin-top:14px;background:var(--bg2)}
+.upload p{color:var(--mut);font-size:13px;margin:6px 0 12px}
+.upload input{display:none}
+.tbl{overflow-x:auto;border:1px solid var(--line);border-radius:var(--r);background:var(--card)}
+table{border-collapse:collapse;width:100%;font-size:13px}
+th,td{padding:9px 10px;text-align:right;white-space:nowrap;border-bottom:1px solid var(--line)}
+th{color:var(--mut);font-weight:600;font-size:11px;text-transform:uppercase;letter-spacing:.05em;background:var(--bg2);position:sticky;top:0}
+td:first-child,th:first-child{text-align:left;position:sticky;left:0;background:var(--card)}
+th:first-child{background:var(--bg2)}
+#tTor td:first-child,#tMod td:first-child{max-width:150px;overflow:hidden;text-overflow:ellipsis;font-size:12px}
+tr:last-child td{border-bottom:0}
+tr.tot td{font-weight:700;background:var(--bg2)}
+.row{display:flex;gap:10px;align-items:end}
+.row>*{flex:1}
+.pill{display:inline-block;padding:3px 9px;border-radius:99px;font-size:12px;font-weight:600;background:var(--bg2);border:1px solid var(--line)}
+.pill.g{color:var(--acc);border-color:var(--acc2)} .pill.r{color:var(--red);border-color:#7a2b33}
+.toast{position:fixed;left:50%;bottom:24px;transform:translateX(-50%);background:var(--card);border:1px solid var(--acc2);padding:12px 16px;border-radius:12px;z-index:20;max-width:92vw;font-size:14px;box-shadow:0 8px 30px rgba(0,0,0,.5)}
+.split{display:grid;grid-template-columns:1fr auto;gap:6px 12px;font-size:14px}
+.split div:nth-child(even){text-align:right}
+.note{font-size:12px;color:var(--mut);margin-top:8px;line-height:1.45}
+.bar{height:6px;border-radius:9px;background:var(--bg2);overflow:hidden;margin-top:8px}
+.bar i{display:block;height:100%;background:var(--acc)}
+</style>
+</head>
+<body>
+
+<!-- LOGIN -->
+<section id="vAuth" class="auth hidden">
+  <div class="box">
+    <div class="logo"><span class="chip"></span>RunnerApp</div>
+    <p class="sub" id="authSub">Resultados, makeup y split del team. Ingresa con tu cuenta.</p>
+    <div id="fNombreWrap" class="hidden"><label>Nombre (como te conoce el team)</label><input id="aNombre" autocomplete="name"></div>
+    <label>Correo</label><input id="aEmail" type="email" autocomplete="email">
+    <label>Contraseña</label><input id="aPass" type="password" autocomplete="current-password">
+    <div style="margin-top:18px"><button class="btn" id="aBtn">Entrar</button></div>
+    <div class="err" id="aErr"></div>
+    <button class="link" id="aToggle">¿Primera vez? Crear cuenta</button>
+  </div>
+</section>
+
+<!-- CONFIGURACIÓN INICIAL -->
+<section id="vSetup" class="auth hidden">
+  <div class="box">
+    <div class="logo"><span class="chip"></span>RunnerApp</div>
+    <p class="sub">Antes de empezar, tus datos de partida. Puedes cambiarlos luego en “Ajustes”.</p>
+    <label>Nombre</label><input id="sNombre">
+    <label>Fecha desde la que cuenta la app</label><input id="sFecha" type="date">
+    <label>Caja inicial ese día (US$)</label><input id="sCaja" type="number" step="0.01" inputmode="decimal" placeholder="Ej. 2500">
+    <label>Makeup con el que empiezas (US$, en positivo)</label><input id="sMakeup" type="number" step="0.01" inputmode="decimal" placeholder="Ej. 5000 si estás en −5,000. 0 si no tienes">
+    <label>Tu % del deal (lo que te toca a ti)</label><input id="sDeal" type="number" step="0.5" min="0" max="100" inputmode="decimal" placeholder="Ej. 45">
+    <div style="margin-top:18px"><button class="btn" id="sBtn">Guardar y empezar</button></div>
+    <div class="err" id="sErr"></div>
+  </div>
+</section>
+
+<!-- APP -->
+<section id="vApp" class="hidden">
+  <header>
+    <div class="wrap">
+      <div class="logo"><span class="chip"></span>RunnerApp</div>
+      <div class="sp"></div>
+      <select id="verJugador" class="hidden"></select>
+      <button class="btn ghost sm" id="bSalir">Salir</button>
+    </div>
+    <nav class="tabs" id="tabs">
+      <button data-t="resumen" class="on">Resumen</button>
+      <button data-t="diario">Diario</button>
+      <button data-t="stats">Stats</button>
+      <button data-t="mes">Mes y makeup</button>
+      <button data-t="team" class="hidden" id="tabTeam">Team</button>
+      <button data-t="ajustes">Ajustes</button>
+    </nav>
+  </header>
+
+  <main class="wrap">
+    <!-- RESUMEN -->
+    <div data-v="resumen">
+      <div id="hola" class="mut" style="margin:4px 0 12px"></div>
+      <div class="grid" id="kpis"></div>
+      <div class="upload" id="upBox">
+        <strong>Subir resultados de PokerCraft</strong>
+        <p>El .zip que descargas de PokerCraft (o los .txt sueltos). Puedes subir el mismo día dos veces: no se duplica.</p>
+        <label class="btn" style="display:inline-block;width:auto;margin:0;color:#04110b;font-size:15px" for="fZip">Elegir archivo</label>
+        <input id="fZip" type="file" accept=".zip,.txt" multiple>
+        <div id="upMsg" class="note"></div>
+      </div>
+      <h2>Últimos días</h2>
+      <div class="tbl" id="ultDias"></div>
+    </div>
+
+    <!-- DIARIO -->
+    <div data-v="diario" class="hidden">
+      <div class="row" style="margin-top:4px">
+        <div><label>Mes</label><select id="dMes"></select></div>
+      </div>
+      <h2>Historial diario</h2>
+      <div class="tbl" id="tDiario"></div>
+      <p class="note">Entradas incluye re-entradas. Los Day 2 / Final no suman costo (ya se pagó en el Day 1). Montos en US$; los torneos en ¥ se convierten con la tasa del día.</p>
+    </div>
+
+    <!-- STATS -->
+    <div data-v="stats" class="hidden">
+      <div class="row" style="margin-top:4px">
+        <div><label>Periodo</label><select id="stPer"></select></div>
+      </div>
+      <h3>Por modalidad</h3><div class="tbl" id="tMod"></div>
+      <h3>Por buy-in</h3><div class="tbl" id="tBi"></div>
+      <h3>Por torneo (más jugados)</h3><div class="tbl" id="tTor"></div>
+    </div>
+
+    <!-- MES -->
+    <div data-v="mes" class="hidden">
+      <div class="row" style="margin-top:4px">
+        <div><label>Mes</label><select id="mMes"></select></div>
+      </div>
+      <div class="card" style="margin-top:14px" id="mCard"></div>
+      <div class="card" style="margin-top:12px" id="rbCard">
+        <strong>Rakeback del mes</strong>
+        <div class="row" style="margin-top:4px">
+          <div><label>Monto (US$)</label><input id="rbMonto" type="number" step="0.01" inputmode="decimal"></div>
+          <div style="flex:0 0 auto"><button class="btn sm" id="rbBtn" style="padding:11px 16px">Guardar</button></div>
+        </div>
+        <div class="note" id="rbNote"></div>
+      </div>
+      <h2>Cierres anteriores</h2>
+      <div class="tbl" id="tCierres"></div>
+    </div>
+
+    <!-- TEAM (coach) -->
+    <div data-v="team" class="hidden">
+      <div class="row" style="margin-top:4px">
+        <div><label>Mes</label><select id="tmMes"></select></div>
+      </div>
+      <h2>Resultados por jugador</h2>
+      <div class="tbl" id="tTeam"></div>
+      <p class="note">Toca un jugador para ver su detalle. El makeup y la caja son los actuales.</p>
+    </div>
+
+    <!-- AJUSTES -->
+    <div data-v="ajustes" class="hidden">
+      <div class="card" style="margin-top:6px">
+        <label>Nombre</label><input id="jNombre">
+        <label>Fecha de inicio</label><input id="jFecha" type="date">
+        <label>Caja inicial (US$)</label><input id="jCaja" type="number" step="0.01">
+        <label>Makeup inicial (US$, en positivo)</label><input id="jMakeup" type="number" step="0.01">
+        <label>Tu % del deal</label><input id="jDeal" type="number" step="0.5" min="0" max="100">
+        <div style="margin-top:16px"><button class="btn" id="jBtn">Guardar cambios</button></div>
+        <div class="note">Cambiar la caja o el makeup inicial recalcula todo desde la fecha de inicio. Los meses ya cerrados no cambian.</div>
+      </div>
+      <div class="card" style="margin-top:12px">
+        <strong>Borrar torneos de un día</strong>
+        <p class="note">Por si subiste un archivo equivocado.</p>
+        <div class="row" style="margin-top:6px">
+          <div><input id="delFecha" type="date"></div>
+          <div style="flex:0 0 auto"><button class="btn ghost sm" id="delBtn" style="padding:11px 14px">Borrar día</button></div>
+        </div>
+      </div>
+    </div>
+  </main>
+</section>
+
+<div id="toast" class="toast hidden"></div>
+
+<script>
+/* ================== CONFIG ================== */
+const SUPA_URL = "https://hwxckgwswhyqarhcxave.supabase.co";
+const SUPA_KEY = "sb_publishable_uvvrgipXujbERLhQv9fdxw_7MKjH8e2";
+
+/* ================== PARSER POKERCRAFT ================== */
+const NUM = "([\\d,]+(?:\\.\\d+)?)";
+const toN = s => parseFloat(String(s).replace(/,/g, ""));
+function parseSummary(txt) {
+  const t = txt.replace(/\r/g, "");
+  const h = t.match(/^Tournament #(\d+), (.+), ([^,\n]+)$/m);
+  const b = t.match(/^Buy-in: (.+)$/m);
+  const s = t.match(/started (\d{4})\/(\d{2})\/(\d{2}) (\d{2}:\d{2}:\d{2})/);
+  if (!h || !b || !s) return null;
+  const nombre = h[2].trim();
+  const moneda = b[1].includes("¥") ? "CNY" : "USD";
+  const parts = [...b[1].matchAll(new RegExp("[\\$¥€]" + NUM, "g"))].map(m => toN(m[1]));
+  const buyin = parts.reduce((a, x) => a + x, 0);
+  const rake = parts.length >= 2 ? parts[1] : 0;
+  const bounty = parts.length >= 3 ? parts[2] : 0;
+  const re = t.match(/made (\d+) re-entr/i) || t.match(/re-entered (\d+) times/i);
+  const reentradas = re ? parseInt(re[1]) : 0;
+  const w = t.match(new RegExp("received a total of [\\$¥€]" + NUM, "i"));
+  const premio = w ? toN(w[1]) : 0;
+  const p = t.match(/^(\d+)\w*\s*:\s*Hero/m);
+  const ins = t.match(/^([\d,]+) Players/m);
+  const day2 = /advanced to Day/i.test(t);
+  // Day 2 / Final: el buy-in ya se pagó en el flight
+  const continuacion = /\[(Final|Day\s*[2-9]|Stage\s*[2-9])/i.test(nombre);
+  const costo_total = continuacion ? 0 : buyin * (1 + reentradas);
+  return {
+    gg_id: parseInt(h[1]), nombre, moneda,
+    fecha_hora: `${s[1]}-${s[2]}-${s[3]}T${s[4]}`, fecha: `${s[1]}-${s[2]}-${s[3]}`,
+    buyin: r2(buyin), rake: r2(rake), bounty: r2(bounty), reentradas,
+    costo_total: r2(costo_total), premio: r2(premio),
+    posicion: p ? parseInt(p[1]) : null, inscritos: ins ? parseInt(ins[1].replace(/,/g, "")) : null,
+    modalidad: modalidadDe(nombre, bounty), day2, continuacion
+  };
+}
+function modalidadDe(n, bounty) {
+  const tipo = /mystery/i.test(n) ? "Mystery Bounty" : (bounty > 0 || /bounty|\bP?KO\b/i.test(n)) ? "Bounty" : "Normal";
+  const vel = /hyper/i.test(n) ? "Hyper" : /turbo/i.test(n) ? "Turbo" : "Regular";
+  return tipo + " · " + vel;
+}
+function r2(x) { return Math.round(x * 100) / 100; }
+
+/* ================== TIPO DE CAMBIO ================== */
+async function tasasCNY(fechas) {
+  const need = [...new Set(fechas)].sort();
+  if (!need.length) return {};
+  const map = {};
+  const { data } = await sb.from("tipos_cambio").select("fecha,usd").eq("moneda", "CNY").in("fecha", need);
+  (data || []).forEach(r => map[r.fecha] = +r.usd);
+  const faltan = need.filter(f => !map[f]);
+  if (!faltan.length) return map;
+  // Serie histórica (BCE vía Frankfurter). Fines de semana usan el último día hábil.
+  const ini = addDays(faltan[0], -6), fin = faltan[faltan.length - 1];
+  let serie = null;
+  for (const u of [`https://api.frankfurter.dev/v1/${ini}..${fin}?base=CNY&symbols=USD`,
+                   `https://api.frankfurter.app/${ini}..${fin}?from=CNY&to=USD`]) {
+    try { const r = await fetch(u); if (r.ok) { const j = await r.json(); if (j.rates) { serie = j.rates; break; } } } catch (e) {}
+  }
+  let ultima = null;
+  if (!serie || !Object.keys(serie).length) {
+    try { const r = await fetch("https://open.er-api.com/v6/latest/CNY"); const j = await r.json(); ultima = j.rates && j.rates.USD; } catch (e) {}
+  }
+  const dias = serie ? Object.keys(serie).sort() : [];
+  const nuevos = [];
+  for (const f of faltan) {
+    let v = null;
+    for (const d of dias) { if (d <= f) v = serie[d].USD; else break; }
+    if (!v && dias.length) v = serie[dias[0]].USD;
+    if (!v) v = ultima;
+    if (!v) throw new Error("No se pudo obtener el tipo de cambio ¥→$. Revisa tu internet e intenta de nuevo.");
+    map[f] = v; nuevos.push({ fecha: f, moneda: "CNY", usd: v });
+  }
+  if (nuevos.length) await sb.from("tipos_cambio").upsert(nuevos, { onConflict: "fecha,moneda", ignoreDuplicates: true });
+  return map;
+}
+function addDays(f, n) { const d = new Date(f + "T12:00:00Z"); d.setUTCDate(d.getUTCDate() + n); return d.toISOString().slice(0, 10); }
+
+/* ================== ESTADO ================== */
+let sb, user, yo, esCoach = false, perfiles = [], verId = null;
+let P = null, T = [], RB = [], C = []; // perfil visto, torneos, rakeback, cierres
+let modoRegistro = false;
+const $ = id => document.getElementById(id);
+const fmt = (x, d = 2) => (x < 0 ? "−" : "") + "$" + Math.abs(x).toLocaleString("en-US", { minimumFractionDigits: d, maximumFractionDigits: d });
+const fmt0 = x => fmt(x, 0);
+const cls = x => x > 0.004 ? "pos" : x < -0.004 ? "neg" : "";
+const pct = x => isFinite(x) ? (x >= 0 ? "+" : "−") + Math.abs(x).toFixed(1) + "%" : "—";
+const MESES = ["enero","febrero","marzo","abril","mayo","junio","julio","agosto","septiembre","octubre","noviembre","diciembre"];
+const mesTxt = m => { const [y, mm] = m.split("-"); return MESES[+mm - 1] + " " + y; };
+const mesDe = f => f.slice(0, 7) + "-01";
+const hoy = () => new Date().toLocaleDateString("en-CA");
+function toast(m, ms = 3500) { const e = $("toast"); e.textContent = m; e.classList.remove("hidden"); clearTimeout(e._t); e._t = setTimeout(() => e.classList.add("hidden"), ms); }
+function show(v) { ["vAuth", "vSetup", "vApp"].forEach(x => $(x).classList.toggle("hidden", x !== v)); }
+
+/* ================== AUTH ================== */
+async function init() {
+  if (!window.supabase) { document.body.innerHTML = "<p style='padding:30px'>No se pudo cargar. Revisa tu conexión y recarga.</p>"; return; }
+  sb = supabase.createClient(SUPA_URL, SUPA_KEY);
+  const { data: { session } } = await sb.auth.getSession();
+  if (session) await entrar(session.user); else show("vAuth");
+}
+$("aToggle").onclick = () => {
+  modoRegistro = !modoRegistro;
+  $("fNombreWrap").classList.toggle("hidden", !modoRegistro);
+  $("aBtn").textContent = modoRegistro ? "Crear cuenta" : "Entrar";
+  $("aToggle").textContent = modoRegistro ? "Ya tengo cuenta" : "¿Primera vez? Crear cuenta";
+  $("aErr").textContent = "";
+};
+$("aBtn").onclick = async () => {
+  const email = $("aEmail").value.trim(), password = $("aPass").value;
+  $("aErr").className = "err"; $("aErr").textContent = "";
+  if (!email || password.length < 6) { $("aErr").textContent = "Correo y contraseña (mínimo 6 caracteres)."; return; }
+  $("aBtn").disabled = true;
+  try {
+    if (modoRegistro) {
+      const { data, error } = await sb.auth.signUp({ email, password, options: { data: { nombre: $("aNombre").value.trim() } } });
+      if (error) throw error;
+      if (!data.session) { $("aErr").className = "ok"; $("aErr").textContent = "Listo. Revisa tu correo y confirma la cuenta; luego entra aquí."; return; }
+      await entrar(data.user);
+    } else {
+      const { data, error } = await sb.auth.signInWithPassword({ email, password });
+      if (error) throw error;
+      await entrar(data.user);
+    }
+  } catch (e) {
+    $("aErr").textContent = /Invalid login/i.test(e.message) ? "Correo o contraseña incorrectos." : /confirm/i.test(e.message) ? "Primero confirma tu correo (revisa tu bandeja)." : e.message;
+  } finally { $("aBtn").disabled = false; }
+};
+$("bSalir").onclick = async () => { await sb.auth.signOut(); location.reload(); };
+
+async function entrar(u) {
+  user = u;
+  const [{ data: c }, { data: p }] = await Promise.all([sb.rpc("es_coach"), sb.from("perfiles").select("*").eq("id", u.id).maybeSingle()]);
+  esCoach = !!c;
+  yo = p;
+  if (!yo) { const { data } = await sb.from("perfiles").insert({ id: u.id, nombre: (u.user_metadata && u.user_metadata.nombre) || u.email.split("@")[0] }).select().single(); yo = data; }
+  if (!yo.configurado && !esCoach) { abrirSetup(); return; }
+  await abrirApp();
+}
+function abrirSetup() {
+  $("sNombre").value = yo.nombre || ""; $("sFecha").value = mesDe(hoy());
+  show("vSetup");
+}
+$("sBtn").onclick = async () => {
+  const caja = toN($("sCaja").value || 0), mk = Math.abs(toN($("sMakeup").value || 0)), deal = toN($("sDeal").value);
+  if (!$("sFecha").value || !(deal >= 0 && deal <= 100) || isNaN(caja) || isNaN(mk)) { $("sErr").textContent = "Completa fecha, caja, makeup y % del deal."; return; }
+  const { data, error } = await sb.from("perfiles").update({ nombre: $("sNombre").value.trim() || yo.nombre, fecha_inicio: $("sFecha").value, caja_inicial: caja, makeup_inicial: -mk, deal_jugador: deal, configurado: true }).eq("id", user.id).select().single();
+  if (error) { $("sErr").textContent = error.message; return; }
+  yo = data; await abrirApp();
+};
+
+/* ================== APP ================== */
+async function abrirApp() {
+  show("vApp");
+  $("tabTeam").classList.toggle("hidden", !esCoach);
+  if (esCoach) {
+    const { data } = await sb.from("perfiles").select("*").order("nombre");
+    perfiles = (data || []).filter(p => p.configurado);
+    const sel = $("verJugador");
+    sel.innerHTML = (yo.configurado ? `<option value="${yo.id}">Yo (${esc(yo.nombre)})</option>` : "") +
+      perfiles.filter(p => p.id !== yo.id).map(p => `<option value="${p.id}">${esc(p.nombre)}</option>`).join("");
+    sel.classList.toggle("hidden", !sel.options.length);
+    sel.onchange = () => cargarJugador(sel.value);
+    if (!yo.configurado) { tab("team"); verId = sel.value || null; if (verId) await cargarJugador(verId, true); await pintarTeam(); return; }
+  }
+  await cargarJugador(yo.id);
+}
+function esc(s) { return String(s ?? "").replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c])); }
+
+async function traerTodo(tabla, filtro) {
+  let out = [], i = 0;
+  while (true) {
+    let q = sb.from(tabla).select("*").range(i, i + 999);
+    q = filtro(q);
+    const { data, error } = await q;
+    if (error) throw error;
+    out = out.concat(data); if (data.length < 1000) break; i += 1000;
+  }
+  return out;
+}
+async function cargarJugador(id, silencio) {
+  verId = id;
+  const propio = id === user.id;
+  P = propio ? yo : perfiles.find(p => p.id === id);
+  [T, { data: RB }, { data: C }] = await Promise.all([
+    traerTodo("torneos", q => q.eq("jugador_id", id).order("fecha_hora")),
+    sb.from("rakeback").select("*").eq("jugador_id", id),
+    sb.from("cierres_mes").select("*").eq("jugador_id", id).order("mes")
+  ]);
+  T.forEach(t => { t.entradas = (t.costo_usd > 0 ? 1 + t.reentradas : 0); });
+  $("upBox").classList.toggle("hidden", !propio);
+  $("rbBtn").disabled = !propio; $("rbMonto").disabled = !propio;
+  document.querySelector('[data-t="ajustes"]').classList.toggle("hidden", !propio);
+  if (!silencio) pintarTodo();
+}
+function pintarTodo() { llenarMeses(); pintarResumen(); pintarDiario(); pintarStats(); pintarMes(); if (esCoach) pintarTeam(); }
+
+/* --- tabs --- */
+$("tabs").onclick = e => { const b = e.target.closest("button"); if (b) tab(b.dataset.t); };
+function tab(t) {
+  document.querySelectorAll("#tabs button").forEach(b => b.classList.toggle("on", b.dataset.t === t));
+  document.querySelectorAll("[data-v]").forEach(v => v.classList.toggle("hidden", v.dataset.v !== t));
+  if (t === "ajustes") llenarAjustes();
+  window.scrollTo(0, 0);
+}
+
+/* --- cálculos --- */
+function agregar(lista) {
+  const a = { torneos: lista.length, entradas: 0, inv: 0, cob: 0, itm: 0 };
+  lista.forEach(t => { a.entradas += t.entradas; a.inv += +t.costo_usd; a.cob += +t.premio_usd; if (+t.premio_usd > 0) a.itm++; });
+  a.neto = a.cob - a.inv; a.abi = a.entradas ? a.inv / a.entradas : 0; a.roi = a.inv ? a.neto / a.inv * 100 : NaN;
+  return a;
+}
+function porDia(lista) {
+  const m = {}; lista.forEach(t => (m[t.fecha] = m[t.fecha] || []).push(t));
+  return Object.keys(m).sort().map(f => ({ fecha: f, ...agregar(m[f]) }));
+}
+function cuentan() { return T.filter(t => t.fecha >= P.fecha_inicio); }
+function cajaPorDia() {
+  let caja = +P.caja_inicial; const out = {};
+  porDia(cuentan()).forEach(d => { out[d.fecha] = { ini: caja, fin: caja + d.neto }; caja += d.neto; });
+  return { dias: out, actual: caja };
+}
+function mesesConDatos() {
+  const s = new Set(T.map(t => mesDe(t.fecha))); s.add(mesDe(hoy()));
+  return [...s].sort().reverse();
+}
+// makeup: base = último cierre o makeup inicial; suma neto desde ahí
+function estadoMakeup() {
+  const ult = C.length ? C[C.length - 1] : null;
+  const desde = ult ? addMonth(ult.mes, 1) : P.fecha_inicio;
+  const base = ult ? +ult.makeup_siguiente : +P.makeup_inicial;
+  const neto = agregar(cuentan().filter(t => t.fecha >= desde)).neto;
+  return { base, desde, actual: base + neto, mesAbierto: ult ? addMonth(ult.mes, 1) : mesDe(P.fecha_inicio) };
+}
+function addMonth(m, n) { const [y, mm] = m.split("-").map(Number); const d = new Date(Date.UTC(y, mm - 1 + n, 1)); return d.toISOString().slice(0, 10); }
+function calcCierre(mes) {
+  const st = estadoMakeup();
+  const fin = addMonth(mes, 1);
+  const tMes = cuentan().filter(t => t.fecha >= mes && t.fecha < fin);
+  const neto = agregar(tMes).neto;
+  const makeup_inicio = st.base;
+  const balance = makeup_inicio + neto;
+  const deal = +P.deal_jugador;
+  const rb = +(RB.find(r => r.mes === mes)?.monto_usd || 0);
+  const split = balance > 0 ? balance : 0;
+  return {
+    mes, makeup_inicio: r2(makeup_inicio), neto_mes: r2(neto), balance: r2(balance), deal_jugador: deal,
+    split_jugador: r2(split * deal / 100), split_team: r2(split - split * deal / 100),
+    rakeback: r2(rb), rakeback_jugador: r2(rb * deal / 100), rakeback_team: r2(rb - rb * deal / 100),
+    makeup_siguiente: balance > 0 ? 0 : r2(balance), torneos: tMes.length
+  };
+}
+
+/* --- RESUMEN --- */
+function pintarResumen() {
+  const propio = verId === user.id;
+  $("hola").innerHTML = propio ? `Hola, <b>${esc(P.nombre)}</b> · deal ${+P.deal_jugador}%` : `Viendo a <b>${esc(P.nombre)}</b> · deal ${+P.deal_jugador}%`;
+  const mesAct = mesDe(hoy()), fin = addMonth(mesAct, 1);
+  const am = agregar(cuentan().filter(t => t.fecha >= mesAct && t.fecha < fin));
+  const tot = agregar(T);
+  const caja = cajaPorDia().actual, mk = estadoMakeup();
+  const k = (l, v, s, c = "") => `<div class="card kpi"><div class="l">${l}</div><div class="v num ${c}">${v}</div><div class="s">${s}</div></div>`;
+  $("kpis").innerHTML =
+    k("Caja actual", fmt0(caja), "desde " + fFecha(P.fecha_inicio), cls(0)) +
+    k("Makeup", mk.actual >= 0 ? "+" + fmt0(mk.actual).replace("$", "$") : fmt0(mk.actual), mk.actual >= 0 ? "por encima: habrá split" : "falta recuperar", cls(mk.actual)) +
+    k("Neto " + MESES[+mesAct.slice(5, 7) - 1], fmt0(am.neto), am.torneos + " torneos · ROI " + pct(am.roi), cls(am.neto)) +
+    k("ABI del mes", fmt(am.abi), am.entradas + " entradas") +
+    k("Neto total", fmt0(tot.neto), tot.torneos + " torneos subidos", cls(tot.neto)) +
+    k("ROI total", pct(tot.roi), "ITM " + (tot.torneos ? (tot.itm / tot.torneos * 100).toFixed(1) : 0) + "%", cls(tot.roi));
+  const cj = cajaPorDia().dias;
+  const dias = porDia(T).slice(-7).reverse();
+  $("ultDias").innerHTML = dias.length ? tablaDias(dias, cj) : `<p class="mut" style="padding:16px">Aún no hay torneos. ${propio ? "Sube tu primer zip de PokerCraft arriba." : ""}</p>`;
+}
+function fFecha(f) { const [y, m, d] = f.split("-"); return `${d}/${m}/${y.slice(2)}`; }
+const DSEM = ["dom", "lun", "mar", "mié", "jue", "vie", "sáb"];
+function tablaDias(dias, cj, total) {
+  let h = `<table><tr><th>Día</th><th>Torneos</th><th>Entradas</th><th>ABI</th><th>Invertido</th><th>Cobrado</th><th>Neto</th><th>Caja ini.</th><th>Caja fin.</th></tr>`;
+  dias.forEach(d => {
+    const c = cj[d.fecha]; const dw = DSEM[new Date(d.fecha + "T12:00:00Z").getUTCDay()];
+    h += `<tr><td>${dw} ${fFecha(d.fecha)}</td><td class="num">${d.torneos}</td><td class="num">${d.entradas}</td><td class="num">${fmt(d.abi)}</td><td class="num">${fmt(d.inv)}</td><td class="num">${fmt(d.cob)}</td><td class="num ${cls(d.neto)}">${fmt(d.neto)}</td><td class="num">${c ? fmt0(c.ini) : "—"}</td><td class="num">${c ? fmt0(c.fin) : "—"}</td></tr>`;
+  });
+  if (total) h += `<tr class="tot"><td>Total</td><td class="num">${total.torneos}</td><td class="num">${total.entradas}</td><td class="num">${fmt(total.abi)}</td><td class="num">${fmt(total.inv)}</td><td class="num">${fmt(total.cob)}</td><td class="num ${cls(total.neto)}">${fmt(total.neto)}</td><td></td><td></td></tr>`;
+  return h + "</table>";
+}
+
+/* --- selects de meses --- */
+function llenarMeses() {
+  const ms = mesesConDatos();
+  const op = ms.map(m => `<option value="${m}">${mesTxt(m)}</option>`).join("");
+  ["dMes", "mMes", "tmMes"].forEach(id => { const v = $(id).value; $(id).innerHTML = op; if (v && ms.includes(v)) $(id).value = v; });
+  const v = $("stPer").value;
+  $("stPer").innerHTML = `<option value="all">Todo</option><option value="90">Últimos 90 días</option><option value="30">Últimos 30 días</option>` + op;
+  if (v) $("stPer").value = v;
+}
+$("dMes").onchange = pintarDiario; $("stPer").onchange = pintarStats; $("mMes").onchange = pintarMes; $("tmMes").onchange = pintarTeam;
+
+/* --- DIARIO --- */
+function pintarDiario() {
+  const m = $("dMes").value, fin = addMonth(m, 1);
+  const lista = T.filter(t => t.fecha >= m && t.fecha < fin);
+  const dias = porDia(lista).reverse();
+  $("tDiario").innerHTML = dias.length ? tablaDias(dias, cajaPorDia().dias, agregar(lista)) : `<p class="mut" style="padding:16px">Sin torneos en ${mesTxt(m)}.</p>`;
+}
+
+/* --- STATS --- */
+function rangoBI(x) {
+  const R = [[0, 5.5, "Hasta $5"], [5.5, 11.5, "$5–11"], [11.5, 23, "$11–22"], [23, 56, "$22–55"], [56, 111, "$55–109"], [111, 222, "$110–215"], [222, 1e9, "$215+"]];
+  const r = R.find(([a, b]) => x >= a && x < b); return r ? r[2] : "?";
+}
+const ORDEN_BI = ["Hasta $5", "$5–11", "$11–22", "$22–55", "$55–109", "$110–215", "$215+"];
+function baseNombre(n) { return n.replace(/\s*\[(Stage|Day|Final|Last Chance)[^\]]*\]/ig, "").trim(); }
+function tablaGrupos(grupos, titulo) {
+  let h = `<table><tr><th>${titulo}</th><th>Torneos</th><th>ABI</th><th>Invertido</th><th>Neto</th><th>ROI</th><th>ITM</th></tr>`;
+  grupos.forEach(([k, a]) => h += `<tr><td>${esc(k)}</td><td class="num">${a.torneos}</td><td class="num">${fmt(a.abi)}</td><td class="num">${fmt0(a.inv)}</td><td class="num ${cls(a.neto)}">${fmt0(a.neto)}</td><td class="num ${cls(a.roi)}">${pct(a.roi)}</td><td class="num">${(a.itm / a.torneos * 100).toFixed(0)}%</td></tr>`);
+  return grupos.length ? h + "</table>" : `<p class="mut" style="padding:16px">Sin datos.</p>`;
+}
+function agrupar(lista, key) {
+  const m = {}; lista.forEach(t => { const k = key(t); (m[k] = m[k] || []).push(t); });
+  return Object.entries(m).map(([k, v]) => [k, agregar(v)]);
+}
+function pintarStats() {
+  const p = $("stPer").value; let lista = T;
+  if (p === "90" || p === "30") { const d = addDays(hoy(), -(+p)); lista = T.filter(t => t.fecha >= d); }
+  else if (p && p !== "all") { const fin = addMonth(p, 1); lista = T.filter(t => t.fecha >= p && t.fecha < fin); }
+  $("tMod").innerHTML = tablaGrupos(agrupar(lista, t => t.modalidad).sort((a, b) => b[1].torneos - a[1].torneos), "Modalidad");
+  $("tBi").innerHTML = tablaGrupos(agrupar(lista.filter(t => t.entradas > 0), t => rangoBI(+t.buyin_usd)).sort((a, b) => ORDEN_BI.indexOf(a[0]) - ORDEN_BI.indexOf(b[0])), "Buy-in");
+  $("tTor").innerHTML = tablaGrupos(agrupar(lista, t => baseNombre(t.nombre)).sort((a, b) => b[1].torneos - a[1].torneos || b[1].inv - a[1].inv).slice(0, 40), "Torneo");
+}
+
+/* --- MES Y MAKEUP --- */
+let confirmando = false;
+function pintarMes() {
+  const m = $("mMes").value; const propio = verId === user.id;
+  const cerrado = C.find(c => c.mes === m);
+  const st = estadoMakeup();
+  const rb = RB.find(r => r.mes === m);
+  $("rbMonto").value = rb ? rb.monto_usd : "";
+  $("rbNote").textContent = `Se reparte según el deal: ${+P.deal_jugador}% para ti, ${100 - P.deal_jugador}% para el team.`;
+  let x, tit;
+  if (cerrado) { x = cerrado; tit = `<span class="pill g">Cerrado</span>`; }
+  else if (m === st.mesAbierto) { x = calcCierre(m); tit = `<span class="pill">Abierto</span>`; }
+  else if (m < st.mesAbierto) { $("mCard").innerHTML = `<strong>${mesTxt(m)}</strong><p class="note">Este mes es anterior a tu fecha de inicio en la app (${fFecha(P.fecha_inicio)}).</p>`; pintarCierres(); return; }
+  else { $("mCard").innerHTML = `<strong>${mesTxt(m)}</strong><p class="note">Primero hay que cerrar ${mesTxt(st.mesAbierto)}.</p>`; pintarCierres(); return; }
+  const hay = x.balance > 0;
+  $("mCard").innerHTML = `
+    <div style="display:flex;justify-content:space-between;align-items:center"><strong>${mesTxt(m)}</strong>${tit}</div>
+    <div class="split" style="margin-top:12px">
+      <div class="mut">Makeup al empezar el mes</div><div class="num ${cls(x.makeup_inicio)}">${fmt(x.makeup_inicio)}</div>
+      <div class="mut">Neto del mes</div><div class="num ${cls(x.neto_mes)}">${fmt(x.neto_mes)}</div>
+      <div><b>Balance</b></div><div class="num ${cls(x.balance)}"><b>${fmt(x.balance)}</b></div>
+    </div>
+    <hr style="border:0;border-top:1px solid var(--line);margin:12px 0">
+    ${hay ? `<div class="split">
+      <div class="mut">Split jugador (${+x.deal_jugador}%)</div><div class="num pos">${fmt(x.split_jugador)}</div>
+      <div class="mut">Split team (${100 - x.deal_jugador}%)</div><div class="num">${fmt(x.split_team)}</div>
+      <div class="mut">Makeup siguiente mes</div><div class="num">$0.00</div></div>`
+    : `<div class="split"><div class="mut">Sin split: el makeup pasa al siguiente mes</div><div class="num neg">${fmt(x.makeup_siguiente)}</div></div>`}
+    <div class="split" style="margin-top:8px">
+      <div class="mut">Rakeback (${fmt(x.rakeback)}) → jugador</div><div class="num pos">${fmt(x.rakeback_jugador)}</div>
+      <div class="mut">Rakeback → team</div><div class="num">${fmt(x.rakeback_team)}</div>
+    </div>
+    ${!cerrado && (propio || esCoach) ? `<div style="margin-top:14px"><button class="btn warn" id="bCerrar">Cerrar ${mesTxt(m)}</button></div>
+      <p class="note">Ciérralo cuando termine el mes y ya hayas subido todos sus torneos y el rakeback. Si sale positivo se hace el split y el makeup vuelve a 0.</p>` : ""}
+    ${cerrado && (propio || esCoach) && C[C.length - 1].mes === m ? `<div style="margin-top:12px"><button class="btn ghost sm" id="bReabrir">Reabrir este mes</button></div>` : ""}`;
+  confirmando = false;
+  if ($("bCerrar")) $("bCerrar").onclick = async () => {
+    if (!confirmando) { confirmando = true; $("bCerrar").textContent = "Toca otra vez para confirmar"; return; }
+    const c = calcCierre(m); delete c.torneos;
+    const { error } = await sb.from("cierres_mes").insert({ ...c, jugador_id: verId });
+    if (error) { toast("Error: " + error.message); return; }
+    toast("Mes cerrado ✔"); await cargarJugador(verId);
+  };
+  if ($("bReabrir")) $("bReabrir").onclick = async () => {
+    if (!confirmando) { confirmando = true; $("bReabrir").textContent = "Toca otra vez para reabrir"; return; }
+    const { error } = await sb.from("cierres_mes").delete().eq("id", cerrado.id);
+    if (error) { toast("Error: " + error.message); return; }
+    toast("Mes reabierto"); await cargarJugador(verId);
+  };
+  pintarCierres();
+}
+function pintarCierres() {
+  if (!C.length) { $("tCierres").innerHTML = `<p class="mut" style="padding:16px">Todavía no hay meses cerrados.</p>`; return; }
+  let h = `<table><tr><th>Mes</th><th>Makeup ini.</th><th>Neto</th><th>Balance</th><th>Split jug.</th><th>Split team</th><th>RB jug.</th><th>RB team</th><th>Makeup sig.</th></tr>`;
+  [...C].reverse().forEach(c => h += `<tr><td>${mesTxt(c.mes)}</td><td class="num">${fmt0(+c.makeup_inicio)}</td><td class="num ${cls(+c.neto_mes)}">${fmt0(+c.neto_mes)}</td><td class="num ${cls(+c.balance)}">${fmt0(+c.balance)}</td><td class="num">${fmt0(+c.split_jugador)}</td><td class="num">${fmt0(+c.split_team)}</td><td class="num">${fmt0(+c.rakeback_jugador)}</td><td class="num">${fmt0(+c.rakeback_team)}</td><td class="num">${fmt0(+c.makeup_siguiente)}</td></tr>`);
+  $("tCierres").innerHTML = h + "</table>";
+}
+$("rbBtn").onclick = async () => {
+  const m = $("mMes").value, v = toN($("rbMonto").value || 0);
+  if (isNaN(v) || v < 0) { toast("Monto inválido"); return; }
+  if (C.find(c => c.mes === m)) { toast("Ese mes ya está cerrado. Reábrelo para cambiar el rakeback."); return; }
+  const { error } = await sb.from("rakeback").upsert({ jugador_id: user.id, mes: m, monto_usd: v }, { onConflict: "jugador_id,mes" });
+  if (error) { toast("Error: " + error.message); return; }
+  toast("Rakeback guardado"); await cargarJugador(verId);
+};
+
+/* --- TEAM (coach) --- */
+async function pintarTeam() {
+  if (!esCoach) return;
+  const m = $("tmMes").value || mesDe(hoy()), fin = addMonth(m, 1);
+  $("tTeam").innerHTML = `<p class="mut" style="padding:16px">Cargando…</p>`;
+  const lista = (yo.configurado ? [yo] : []).concat(perfiles.filter(p => p.id !== yo.id));
+  const [tor, cie] = await Promise.all([
+    traerTodo("torneos", q => q.select("jugador_id,fecha,costo_usd,premio_usd,reentradas")),
+    sb.from("cierres_mes").select("*").order("mes").then(r => r.data || [])
+  ]);
+  let h = `<table><tr><th>Jugador</th><th>Torneos mes</th><th>ABI mes</th><th>Neto mes</th><th>ROI mes</th><th>Makeup actual</th><th>Caja actual</th><th>Deal</th></tr>`;
+  const tot = { t: 0, n: 0, inv: 0, e: 0 };
+  lista.forEach(p => {
+    const mis = tor.filter(t => t.jugador_id === p.id).map(t => ({ ...t, entradas: +t.costo_usd > 0 ? 1 + t.reentradas : 0 }));
+    const cuenta = mis.filter(t => t.fecha >= p.fecha_inicio);
+    const am = agregar(cuenta.filter(t => t.fecha >= m && t.fecha < fin));
+    const cs = cie.filter(c => c.jugador_id === p.id); const ult = cs[cs.length - 1];
+    const desde = ult ? addMonth(ult.mes, 1) : p.fecha_inicio;
+    const mk = (ult ? +ult.makeup_siguiente : +p.makeup_inicial) + agregar(cuenta.filter(t => t.fecha >= desde)).neto;
+    const caja = +p.caja_inicial + agregar(cuenta).neto;
+    tot.t += am.torneos; tot.n += am.neto; tot.inv += am.inv; tot.e += am.entradas;
+    h += `<tr data-id="${p.id}" style="cursor:pointer"><td><b>${esc(p.nombre)}</b></td><td class="num">${am.torneos}</td><td class="num">${fmt(am.abi)}</td><td class="num ${cls(am.neto)}">${fmt0(am.neto)}</td><td class="num ${cls(am.roi)}">${pct(am.roi)}</td><td class="num ${cls(mk)}">${fmt0(mk)}</td><td class="num">${fmt0(caja)}</td><td class="num">${+p.deal_jugador}%</td></tr>`;
+  });
+  h += `<tr class="tot"><td>Team</td><td class="num">${tot.t}</td><td class="num">${fmt(tot.e ? tot.inv / tot.e : 0)}</td><td class="num ${cls(tot.n)}">${fmt0(tot.n)}</td><td class="num ${cls(tot.n)}">${pct(tot.inv ? tot.n / tot.inv * 100 : NaN)}</td><td></td><td></td><td></td></tr>`;
+  $("tTeam").innerHTML = lista.length ? h + "</table>" : `<p class="mut" style="padding:16px">Aún no hay jugadores registrados.</p>`;
+  $("tTeam").querySelectorAll("tr[data-id]").forEach(tr => tr.onclick = async () => { $("verJugador").value = tr.dataset.id; await cargarJugador(tr.dataset.id); tab("resumen"); });
+}
+
+/* --- AJUSTES --- */
+function llenarAjustes() {
+  $("jNombre").value = yo.nombre; $("jFecha").value = yo.fecha_inicio; $("jCaja").value = yo.caja_inicial;
+  $("jMakeup").value = Math.abs(yo.makeup_inicial); $("jDeal").value = yo.deal_jugador;
+}
+$("jBtn").onclick = async () => {
+  const d = { nombre: $("jNombre").value.trim(), fecha_inicio: $("jFecha").value, caja_inicial: toN($("jCaja").value || 0), makeup_inicial: -Math.abs(toN($("jMakeup").value || 0)), deal_jugador: toN($("jDeal").value), configurado: true };
+  if (!d.fecha_inicio || !(d.deal_jugador >= 0 && d.deal_jugador <= 100)) { toast("Revisa la fecha y el % del deal"); return; }
+  const { data, error } = await sb.from("perfiles").update(d).eq("id", user.id).select().single();
+  if (error) { toast("Error: " + error.message); return; }
+  yo = data; toast("Guardado ✔"); await cargarJugador(user.id);
+};
+$("delBtn").onclick = async () => {
+  const f = $("delFecha").value; if (!f) { toast("Elige un día"); return; }
+  const n = T.filter(t => t.fecha === f).length;
+  if (!n) { toast("No hay torneos ese día"); return; }
+  if ($("delBtn").dataset.c !== f) { $("delBtn").dataset.c = f; $("delBtn").textContent = `¿Borrar ${n}? Toca otra vez`; return; }
+  const { error } = await sb.from("torneos").delete().eq("jugador_id", user.id).eq("fecha", f);
+  $("delBtn").dataset.c = ""; $("delBtn").textContent = "Borrar día";
+  if (error) { toast("Error: " + error.message); return; }
+  toast(`${n} torneos borrados`); await cargarJugador(user.id);
+};
+
+/* --- SUBIDA --- */
+$("fZip").onchange = async e => {
+  const files = [...e.target.files]; e.target.value = "";
+  if (!files.length) return;
+  const msg = $("upMsg"); msg.className = "note"; msg.textContent = "Leyendo archivos…";
+  try {
+    const textos = [];
+    for (const f of files) {
+      if (/\.zip$/i.test(f.name)) {
+        const z = await JSZip.loadAsync(f);
+        for (const ent of Object.values(z.files)) if (!ent.dir && /\.txt$/i.test(ent.name)) textos.push(await ent.async("string"));
+      } else textos.push(await f.text());
+    }
+    const filas = textos.map(parseSummary).filter(Boolean);
+    if (!filas.length) { msg.textContent = "No encontré resúmenes de torneos en ese archivo. Debe ser el export de PokerCraft (Tournament results)."; return; }
+    msg.textContent = `Encontré ${filas.length} torneos. Convirtiendo ¥ a $…`;
+    const tasas = await tasasCNY(filas.filter(f => f.moneda === "CNY").map(f => f.fecha));
+    const reg = filas.map(f => {
+      const tc = f.moneda === "CNY" ? tasas[f.fecha] : 1;
+      const o = { ...f, jugador_id: user.id, tipo_cambio: tc, buyin_usd: r2(f.buyin * tc), costo_usd: r2(f.costo_total * tc), premio_usd: r2(f.premio * tc) };
+      delete o.fecha; delete o.continuacion; return o;
+    });
+    // quitar duplicados dentro del mismo lote
+    const uniq = Object.values(Object.fromEntries(reg.map(r => [r.gg_id, r])));
+    const antes = new Set(T.map(t => +t.gg_id));
+    const nuevos = uniq.filter(r => !antes.has(r.gg_id)).length;
+    msg.textContent = "Guardando…";
+    for (let i = 0; i < uniq.length; i += 500) {
+      const { error } = await sb.from("torneos").upsert(uniq.slice(i, i + 500), { onConflict: "jugador_id,gg_id" });
+      if (error) throw error;
+    }
+    const a = agregar(uniq.map(r => ({ ...r, entradas: r.costo_usd > 0 ? 1 + r.reentradas : 0 })));
+    msg.className = "ok";
+    msg.innerHTML = `✔ ${uniq.length} torneos (${nuevos} nuevos, ${uniq.length - nuevos} ya estaban). Neto del archivo: <b class="${cls(a.neto)}">${fmt(a.neto)}</b>`;
+    await cargarJugador(user.id);
+  } catch (err) {
+    msg.className = "err"; msg.textContent = "Error: " + (err.message || err);
+  }
+};
+
+init();
+</script>
+</body>
+</html>
