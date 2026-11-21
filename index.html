@@ -184,6 +184,7 @@ tr.tot td{font-weight:700;background:var(--bg2)}
       <h3>Por modalidad</h3><div class="tbl" id="tMod"></div>
       <h3>Por buy-in</h3><div class="tbl" id="tBi"></div>
       <h3>Por torneo (más jugados)</h3><div class="tbl" id="tTor"></div>
+      <p class="note"><b>ROI</b> = neto ÷ invertido. <b>ITM</b> = % de torneos en los que entraste en premios. En los torneos con bounty, PokerCraft suma las recompensas al premio, así que ahí el ITM se estima: cuenta solo si terminaste dentro del 15% de arriba del field.</p>
     </div>
 
     <!-- MES -->
@@ -477,9 +478,18 @@ function tab(t) {
 }
 
 /* --- cálculos --- */
+// ITM: en torneos con bounty, PokerCraft suma las recompensas al premio, así que cobrar algo no significa
+// haber entrado en premios. Ahí contamos ITM solo si terminaste en el ~15% de arriba (zona de pago de GG).
+const ZONA_PAGO = 0.15;
+function esITM(t) {
+  if (!(+t.premio_usd > 0)) return false;
+  const bounty = +t.bounty > 0 || /bounty/i.test(t.modalidad || "");
+  if (!bounty || !t.posicion || !t.inscritos) return true;
+  return t.posicion <= Math.ceil(t.inscritos * ZONA_PAGO);
+}
 function agregar(lista) {
   const a = { torneos: lista.length, entradas: 0, inv: 0, cob: 0, itm: 0 };
-  lista.forEach(t => { a.entradas += t.entradas; a.inv += +t.costo_usd; a.cob += +t.premio_usd; if (+t.premio_usd > 0) a.itm++; });
+  lista.forEach(t => { a.entradas += t.entradas; a.inv += +t.costo_usd; a.cob += +t.premio_usd; if (esITM(t)) a.itm++; });
   a.neto = a.cob - a.inv; a.abi = a.entradas ? a.inv / a.entradas : 0; a.roi = a.inv ? a.neto / a.inv * 100 : NaN;
   return a;
 }
