@@ -343,7 +343,7 @@ $("aBtn").onclick = async () => {
   $("aBtn").disabled = true;
   try {
     if (modoRegistro) {
-      const { data, error } = await sb.auth.signUp({ email, password, options: { data: { nombre: $("aNombre").value.trim() } } });
+      const { data, error } = await sb.auth.signUp({ email, password, options: { emailRedirectTo: location.origin, data: { nombre: $("aNombre").value.trim() } } });
       if (error) throw error;
       if (!data.session) { $("aErr").className = "ok"; $("aErr").textContent = "Listo. Revisa tu correo y confirma la cuenta; luego entra aquí."; return; }
       await entrar(data.user);
