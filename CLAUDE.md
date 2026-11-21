@@ -4,7 +4,8 @@ La versión principal vive en el Proyecto de claude.ai "CREAR APPS" como `claude
 
 ## Resumen
 - App del team de póker de David (6 jugadores + 2 coaches). Un solo `index.html` sin frameworks.
-- Supabase: proyecto `runnerapp` (ref `hwxckgwswhyqarhcxave`, sa-east-1). Vercel publica `main` automáticamente.
+- App publicada: https://runnerapp-eight.vercel.app · Repo: dvidvigo-spec/RunnerApp · Vercel publica `main` automáticamente.
+- Supabase: proyecto `runnerapp` (ref `hwxckgwswhyqarhcxave`, sa-east-1). Auth: Site URL y Redirect URL apuntan a la app.
 - Cada jugador sube el .zip de PokerCraft (un .txt por torneo) → historial diario, stats, makeup (por torneos y en vivo por caja), cierre mensual con split según su deal, rakeback mensual.
 - Coaches: correos en la tabla `coaches`; ven a todos vía `es_coach()` y RLS.
 
