@@ -39,6 +39,9 @@ label{display:block;font-size:13px;color:var(--mut);margin:12px 0 6px}
 .sub{color:var(--mut);margin:8px 0 22px;line-height:1.45}
 .err{color:var(--red);font-size:13px;margin-top:10px;min-height:18px}
 .ok{color:var(--acc);font-size:13px;margin-top:10px}
+.pw{position:relative}.pw input{padding-right:46px}
+.eye{position:absolute;right:6px;top:50%;transform:translateY(-50%);background:none;color:var(--mut);font-size:17px;padding:6px 8px;opacity:.75}
+.eye.on{opacity:1;color:var(--acc)}
 .link{background:none;color:var(--acc);padding:0;font-size:14px;margin-top:14px}
 /* header */
 header{position:sticky;top:0;z-index:5;background:rgba(12,20,17,.92);backdrop-filter:blur(10px);border-bottom:1px solid var(--line)}
@@ -94,7 +97,10 @@ tr.tot td{font-weight:700;background:var(--bg2)}
     <p class="sub" id="authSub">Resultados, makeup y split del team. Ingresa con tu cuenta.</p>
     <div id="fNombreWrap" class="hidden"><label>Nombre (como te conoce el team)</label><input id="aNombre" autocomplete="name"></div>
     <label>Correo</label><input id="aEmail" type="email" autocomplete="email">
-    <label>Contraseña</label><input id="aPass" type="password" autocomplete="current-password">
+    <label>Contraseña</label>
+    <div class="pw"><input id="aPass" type="password" autocomplete="current-password"><button type="button" class="eye" data-for="aPass" aria-label="Ver contraseña">👁</button></div>
+    <div id="fPass2Wrap" class="hidden"><label>Repite la contraseña</label>
+    <div class="pw"><input id="aPass2" type="password" autocomplete="new-password"><button type="button" class="eye" data-for="aPass2" aria-label="Ver contraseña">👁</button></div></div>
     <div style="margin-top:18px"><button class="btn" id="aBtn">Entrar</button></div>
     <div class="err" id="aErr"></div>
     <button class="link" id="aToggle">¿Primera vez? Crear cuenta</button>
@@ -108,9 +114,9 @@ tr.tot td{font-weight:700;background:var(--bg2)}
     <p class="sub">Antes de empezar, tus datos de partida. Puedes cambiarlos luego en “Ajustes”.</p>
     <label>Nombre</label><input id="sNombre">
     <label>Fecha desde la que cuenta la app</label><input id="sFecha" type="date">
-    <label>Caja inicial ese día (US$)</label><input id="sCaja" type="number" step="0.01" inputmode="decimal" placeholder="Ej. 2500">
-    <label>Makeup con el que empiezas (US$, en positivo)</label><input id="sMakeup" type="number" step="0.01" inputmode="decimal" placeholder="Ej. 5000 si estás en −5,000. 0 si no tienes">
-    <label>Tu % del deal (lo que te toca a ti)</label><input id="sDeal" type="number" step="0.5" min="0" max="100" inputmode="decimal" placeholder="Ej. 45">
+    <label>Caja inicial ese día (US$)</label><input id="sCaja" type="text" inputmode="decimal" class="money" autocomplete="off" placeholder="Ej. 2500">
+    <label>Makeup con el que empiezas (US$, en positivo)</label><input id="sMakeup" type="text" inputmode="decimal" class="money" autocomplete="off" placeholder="Ej. 5000 si estás en −5,000. 0 si no tienes">
+    <label>Tu % del deal (lo que te toca a ti)</label><input id="sDeal" type="text" inputmode="decimal" class="pct" autocomplete="off" placeholder="Ej. 45">
     <div style="margin-top:18px"><button class="btn" id="sBtn">Guardar y empezar</button></div>
     <div class="err" id="sErr"></div>
   </div>
@@ -181,7 +187,7 @@ tr.tot td{font-weight:700;background:var(--bg2)}
       <div class="card" style="margin-top:12px" id="rbCard">
         <strong>Rakeback del mes</strong>
         <div class="row" style="margin-top:4px">
-          <div><label>Monto (US$)</label><input id="rbMonto" type="number" step="0.01" inputmode="decimal"></div>
+          <div><label>Monto (US$)</label><input id="rbMonto" type="text" inputmode="decimal" class="money" autocomplete="off" ></div>
           <div style="flex:0 0 auto"><button class="btn sm" id="rbBtn" style="padding:11px 16px">Guardar</button></div>
         </div>
         <div class="note" id="rbNote"></div>
@@ -205,9 +211,9 @@ tr.tot td{font-weight:700;background:var(--bg2)}
       <div class="card" style="margin-top:6px">
         <label>Nombre</label><input id="jNombre">
         <label>Fecha de inicio</label><input id="jFecha" type="date">
-        <label>Caja inicial (US$)</label><input id="jCaja" type="number" step="0.01">
-        <label>Makeup inicial (US$, en positivo)</label><input id="jMakeup" type="number" step="0.01">
-        <label>Tu % del deal</label><input id="jDeal" type="number" step="0.5" min="0" max="100">
+        <label>Caja inicial (US$)</label><input id="jCaja" type="text" inputmode="decimal" class="money" autocomplete="off" >
+        <label>Makeup inicial (US$, en positivo)</label><input id="jMakeup" type="text" inputmode="decimal" class="money" autocomplete="off" >
+        <label>Tu % del deal</label><input id="jDeal" type="text" inputmode="decimal" class="pct" autocomplete="off" >
         <div style="margin-top:16px"><button class="btn" id="jBtn">Guardar cambios</button></div>
         <div class="note">Cambiar la caja o el makeup inicial recalcula todo desde la fecha de inicio. Los meses ya cerrados no cambian.</div>
       </div>
@@ -269,7 +275,28 @@ function modalidadDe(n, bounty) {
   const vel = /hyper/i.test(n) ? "Hyper" : /turbo/i.test(n) ? "Turbo" : "Regular";
   return tipo + " · " + vel;
 }
+// Números escritos por el usuario: acepta 955.50, 955,50, 9,500, 9.500, 9.500,50, $ y espacios
+function numIn(v) {
+  let s = String(v ?? "").trim().replace(/[\s$]/g, "");
+  if (!s) return NaN;
+  const c = s.includes(","), d = s.includes(".");
+  if (c && d) s = s.lastIndexOf(",") > s.lastIndexOf(".") ? s.replace(/\./g, "").replace(",", ".") : s.replace(/,/g, "");
+  else if (c) s = /,\d{1,2}$/.test(s) ? s.replace(",", ".") : s.replace(/,/g, "");
+  else if (d && /^\d{1,3}(\.\d{3})+$/.test(s)) s = s.replace(/\./g, "");
+  return /^-?\d*\.?\d+$/.test(s) ? parseFloat(s) : NaN;
+}
 function r2(x) { return Math.round(x * 100) / 100; }
+
+/* Vista previa bajo cada monto: muestra cómo se entendió el número */
+function prepMontos(root) {
+  (root || document).querySelectorAll("input.money,input.pct").forEach(i => {
+    if (i._prev) return;
+    const n = document.createElement("div"); n.className = "note"; n.style.marginTop = "4px"; i.after(n); i._prev = n;
+    const upd = () => { const v = numIn(i.value); n.textContent = !i.value.trim() ? "" : isNaN(v) ? "Número no válido" : i.classList.contains("pct") ? `= ${v}%` : `= ${fmt(v)}`; n.className = isNaN(v) && i.value.trim() ? "err" : "note"; };
+    i.addEventListener("input", upd); upd();
+  });
+}
+document.addEventListener("click", e => { const b = e.target.closest(".eye"); if (!b) return; const i = $(b.dataset.for); const ver = i.type === "password"; i.type = ver ? "text" : "password"; b.classList.toggle("on", ver); });
 
 /* ================== TIPO DE CAMBIO ================== */
 async function tasasCNY(fechas) {
@@ -332,6 +359,8 @@ async function init() {
 $("aToggle").onclick = () => {
   modoRegistro = !modoRegistro;
   $("fNombreWrap").classList.toggle("hidden", !modoRegistro);
+  $("fPass2Wrap").classList.toggle("hidden", !modoRegistro);
+  $("aPass").autocomplete = modoRegistro ? "new-password" : "current-password";
   $("aBtn").textContent = modoRegistro ? "Crear cuenta" : "Entrar";
   $("aToggle").textContent = modoRegistro ? "Ya tengo cuenta" : "¿Primera vez? Crear cuenta";
   $("aErr").textContent = "";
@@ -340,6 +369,7 @@ $("aBtn").onclick = async () => {
   const email = $("aEmail").value.trim(), password = $("aPass").value;
   $("aErr").className = "err"; $("aErr").textContent = "";
   if (!email || password.length < 6) { $("aErr").textContent = "Correo y contraseña (mínimo 6 caracteres)."; return; }
+  if (modoRegistro && password !== $("aPass2").value) { $("aErr").textContent = "Las contraseñas no coinciden."; return; }
   $("aBtn").disabled = true;
   try {
     if (modoRegistro) {
@@ -368,11 +398,11 @@ async function entrar(u) {
   await abrirApp();
 }
 function abrirSetup() {
-  $("sNombre").value = yo.nombre || ""; $("sFecha").value = mesDe(hoy());
+  $("sNombre").value = yo.nombre || ""; $("sFecha").value = mesDe(hoy()); prepMontos();
   show("vSetup");
 }
 $("sBtn").onclick = async () => {
-  const caja = toN($("sCaja").value || 0), mk = Math.abs(toN($("sMakeup").value || 0)), deal = toN($("sDeal").value);
+  const caja = numIn($("sCaja").value || 0), mk = Math.abs(numIn($("sMakeup").value || 0)), deal = numIn($("sDeal").value);
   if (!$("sFecha").value || !(deal >= 0 && deal <= 100) || isNaN(caja) || isNaN(mk)) { $("sErr").textContent = "Completa fecha, caja, makeup y % del deal."; return; }
   const { data, error } = await sb.from("perfiles").update({ nombre: $("sNombre").value.trim() || yo.nombre, fecha_inicio: $("sFecha").value, caja_inicial: caja, makeup_inicial: -mk, deal_jugador: deal, configurado: true }).eq("id", user.id).select().single();
   if (error) { $("sErr").textContent = error.message; return; }
@@ -530,19 +560,20 @@ function pintarVivo() {
   }
   if (propio) {
     h += `<div class="row" style="margin-top:12px">
-        <div><label style="margin-top:0">Caja ahora (US$)</label><input id="vCaja" type="number" step="0.01" inputmode="decimal" placeholder="Ej. 10000"></div>
+        <div><label style="margin-top:0">Caja ahora (US$)</label><input id="vCaja" type="text" inputmode="decimal" class="money" autocomplete="off" placeholder="Ej. 10000"></div>
         <div style="flex:0 0 auto"><button class="btn sm" id="vBtn" style="padding:11px 16px">Calcular</button></div>
       </div>
       <div class="row" style="margin-top:2px">
-        <div><label>Caja al inicio de ${mesTxt(m)} (US$)</label><input id="vIni" type="number" step="0.01" inputmode="decimal" value="${ci.v ?? ""}" placeholder="¿Con cuánto empezaste el mes?"></div>
+        <div><label>Caja al inicio de ${mesTxt(m)} (US$)</label><input id="vIni" type="text" inputmode="decimal" class="money" autocomplete="off" value="${ci.v ?? ""}" placeholder="¿Con cuánto empezaste el mes?"></div>
         <div style="flex:0 0 auto"><button class="btn ghost sm" id="vIniBtn" style="padding:11px 14px">${ci.guardada ? "Cambiar" : "Guardar"}</button></div>
       </div>
       <p class="note">Usa la caja total de todas tus salas. Si este mes depositaste, retiraste o cobraste rakeback, el cálculo por caja lo incluye; el de torneos no.</p>`;
   }
   $("vivoCard").innerHTML = h;
   if (!propio) return;
+  prepMontos($("vivoCard"));
   $("vBtn").onclick = async () => {
-    const v = toN($("vCaja").value);
+    const v = numIn($("vCaja").value);
     if (isNaN(v) || v < 0) { toast("Escribe cuánto tienes en caja"); return; }
     if (cajaInicioMes(m).v == null) { toast("Primero pon con cuánto empezaste el mes"); $("vIni").focus(); return; }
     const { error } = await sb.from("caja_registros").insert({ jugador_id: user.id, monto: v });
@@ -551,7 +582,7 @@ function pintarVivo() {
     CR = data || []; pintarVivo();
   };
   $("vIniBtn").onclick = async () => {
-    const v = toN($("vIni").value);
+    const v = numIn($("vIni").value);
     if (isNaN(v) || v < 0) { toast("Monto inválido"); return; }
     const { error } = await sb.from("caja_mes").upsert({ jugador_id: user.id, mes: m, caja_inicio: v }, { onConflict: "jugador_id,mes" });
     if (error) { toast("Error: " + error.message); return; }
@@ -645,7 +676,7 @@ function pintarMes() {
   const cerrado = C.find(c => c.mes === m);
   const st = estadoMakeup();
   const rb = RB.find(r => r.mes === m);
-  $("rbMonto").value = rb ? rb.monto_usd : "";
+  $("rbMonto").value = rb ? +rb.monto_usd : ""; prepMontos(); $("rbMonto").dispatchEvent(new Event("input"));
   $("rbNote").textContent = `Se reparte según el deal: ${+P.deal_jugador}% para ti, ${100 - P.deal_jugador}% para el team.`;
   let x, tit;
   if (cerrado) { x = cerrado; tit = `<span class="pill g">Cerrado</span>`; }
@@ -696,7 +727,7 @@ function pintarCierres() {
   $("tCierres").innerHTML = h + "</table>";
 }
 $("rbBtn").onclick = async () => {
-  const m = $("mMes").value, v = toN($("rbMonto").value || 0);
+  const m = $("mMes").value, v = numIn($("rbMonto").value || 0);
   if (isNaN(v) || v < 0) { toast("Monto inválido"); return; }
   if (C.find(c => c.mes === m)) { toast("Ese mes ya está cerrado. Reábrelo para cambiar el rakeback."); return; }
   const { error } = await sb.from("rakeback").upsert({ jugador_id: user.id, mes: m, monto_usd: v }, { onConflict: "jugador_id,mes" });
@@ -749,11 +780,12 @@ async function pintarTeam() {
 /* --- AJUSTES --- */
 function llenarAjustes() {
   $("jNombre").value = yo.nombre; $("jFecha").value = yo.fecha_inicio; $("jCaja").value = yo.caja_inicial;
-  $("jMakeup").value = Math.abs(yo.makeup_inicial); $("jDeal").value = yo.deal_jugador;
+  $("jMakeup").value = Math.abs(yo.makeup_inicial); $("jDeal").value = +yo.deal_jugador;
+  $("jCaja").value = +yo.caja_inicial; prepMontos(); document.querySelectorAll("#jCaja,#jMakeup,#jDeal").forEach(i => i.dispatchEvent(new Event("input")));
 }
 $("jBtn").onclick = async () => {
-  const d = { nombre: $("jNombre").value.trim(), fecha_inicio: $("jFecha").value, caja_inicial: toN($("jCaja").value || 0), makeup_inicial: -Math.abs(toN($("jMakeup").value || 0)), deal_jugador: toN($("jDeal").value), configurado: true };
-  if (!d.fecha_inicio || !(d.deal_jugador >= 0 && d.deal_jugador <= 100)) { toast("Revisa la fecha y el % del deal"); return; }
+  const d = { nombre: $("jNombre").value.trim(), fecha_inicio: $("jFecha").value, caja_inicial: numIn($("jCaja").value || 0), makeup_inicial: -Math.abs(numIn($("jMakeup").value || 0)), deal_jugador: numIn($("jDeal").value), configurado: true };
+  if (!d.fecha_inicio || !(d.deal_jugador >= 0 && d.deal_jugador <= 100) || isNaN(d.caja_inicial) || isNaN(d.makeup_inicial)) { toast("Revisa la fecha, la caja, el makeup y el % del deal"); return; }
   const { data, error } = await sb.from("perfiles").update(d).eq("id", user.id).select().single();
   if (error) { toast("Error: " + error.message); return; }
   yo = data; toast("Guardado ✔"); await cargarJugador(user.id);
