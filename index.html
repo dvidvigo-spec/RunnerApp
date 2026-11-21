@@ -113,9 +113,9 @@ tr.tot td{font-weight:700;background:var(--bg2)}
     <div class="logo"><span class="chip"></span>RunnerApp</div>
     <p class="sub">Antes de empezar, tus datos de partida. Puedes cambiarlos luego en “Ajustes”.</p>
     <label>Nombre</label><input id="sNombre">
-    <label>Fecha desde la que cuenta la app</label><input id="sFecha" type="date">
-    <label>Caja inicial ese día (US$)</label><input id="sCaja" type="text" inputmode="decimal" class="money" autocomplete="off" placeholder="Ej. 2500">
-    <label>Makeup con el que empiezas (US$, en positivo)</label><input id="sMakeup" type="text" inputmode="decimal" class="money" autocomplete="off" placeholder="Ej. 5000 si estás en −5,000. 0 si no tienes">
+    <label>Fecha de hoy (punto de partida)</label><input id="sFecha" type="date">
+    <label>Caja que tienes hoy (US$)</label><input id="sCaja" type="text" inputmode="decimal" class="money" autocomplete="off" placeholder="Ej. 2500">
+    <label>Makeup que tienes hoy (US$, en positivo)</label><input id="sMakeup" type="text" inputmode="decimal" class="money" autocomplete="off" placeholder="Ej. 5000 si estás en −5,000. 0 si no tienes">
     <label>Tu % del deal (lo que te toca a ti)</label><input id="sDeal" type="text" inputmode="decimal" class="pct" autocomplete="off" placeholder="Ej. 45">
     <div style="margin-top:18px"><button class="btn" id="sBtn">Guardar y empezar</button></div>
     <div class="err" id="sErr"></div>
@@ -210,12 +210,12 @@ tr.tot td{font-weight:700;background:var(--bg2)}
     <div data-v="ajustes" class="hidden">
       <div class="card" style="margin-top:6px">
         <label>Nombre</label><input id="jNombre">
-        <label>Fecha de inicio</label><input id="jFecha" type="date">
-        <label>Caja inicial (US$)</label><input id="jCaja" type="text" inputmode="decimal" class="money" autocomplete="off" >
-        <label>Makeup inicial (US$, en positivo)</label><input id="jMakeup" type="text" inputmode="decimal" class="money" autocomplete="off" >
+        <label>Fecha de partida</label><input id="jFecha" type="date">
+        <label>Caja de partida (US$)</label><input id="jCaja" type="text" inputmode="decimal" class="money" autocomplete="off" >
+        <label>Makeup de partida (US$, en positivo)</label><input id="jMakeup" type="text" inputmode="decimal" class="money" autocomplete="off" >
         <label>Tu % del deal</label><input id="jDeal" type="text" inputmode="decimal" class="pct" autocomplete="off" >
         <div style="margin-top:16px"><button class="btn" id="jBtn">Guardar cambios</button></div>
-        <div class="note">Cambiar la caja o el makeup inicial recalcula todo desde la fecha de inicio. Los meses ya cerrados no cambian.</div>
+        <div class="note">La caja y el makeup de partida son los que tenías en la fecha de partida. Desde ahí se calcula el makeup en vivo y por torneos. Los meses ya cerrados no cambian.</div>
       </div>
       <div class="card" style="margin-top:12px">
         <strong>Borrar torneos de un día</strong>
@@ -398,7 +398,7 @@ async function entrar(u) {
   await abrirApp();
 }
 function abrirSetup() {
-  $("sNombre").value = yo.nombre || ""; $("sFecha").value = mesDe(hoy()); prepMontos();
+  $("sNombre").value = yo.nombre || ""; $("sFecha").value = hoy(); prepMontos();
   show("vSetup");
 }
 $("sBtn").onclick = async () => {
@@ -517,77 +517,65 @@ function calcCierre(mes) {
 }
 
 /* --- CAJA EN VIVO --- */
-// makeup al empezar el mes m (antes de jugar ese mes)
-function makeupInicioMes(m) {
-  const cerrado = C.find(c => c.mes === m);
-  if (cerrado) return +cerrado.makeup_inicio;
-  const st = estadoMakeup();
-  if (m <= st.mesAbierto) return st.base;
-  return st.base + agregar(cuentan().filter(t => t.fecha >= st.desde && t.fecha < m)).neto;
-}
-function cajaInicioMes(m) {
-  const r = CM.find(x => x.mes === m);
-  if (r) return { v: +r.caja_inicio, guardada: true };
-  if (mesDe(P.fecha_inicio) === m) return { v: +P.caja_inicial, guardada: false };
-  return { v: null, guardada: false };
-}
-function calcVivo(m, caja) {
-  const ci = cajaInicioMes(m).v, mi = makeupInicioMes(m), deal = +P.deal_jugador;
-  if (ci == null || caja == null) return null;
-  const gan = caja - ci, mk = mi + gan;
-  return { ci, mi, gan, mk, sj: mk > 0 ? mk * deal / 100 : 0, st: mk > 0 ? mk - mk * deal / 100 : 0 };
+// Punto de partida: la caja y el makeup que el jugador puso al empezar,
+// o, si ya hubo un cierre, la caja que quedó después del split + makeup del cierre.
+function refVivo(perfil, cierres, cajasMes) {
+  const ult = cierres.length ? cierres[cierres.length - 1] : null;
+  if (!ult) return { caja: +perfil.caja_inicial, makeup: +perfil.makeup_inicial, desde: perfil.fecha_inicio, falta: false };
+  const mes = addMonth(ult.mes, 1);
+  const cm = cajasMes.find(x => x.mes === mes);
+  return { caja: cm ? +cm.caja_inicio : null, makeup: +ult.makeup_siguiente, desde: mes, falta: !cm, mesCierre: ult.mes };
 }
 function pintarVivo() {
-  const m = mesDe(hoy()), propio = verId === user.id;
-  const ci = cajaInicioMes(m);
-  const ult = CR.find(r => mesDe(new Date(r.creado).toLocaleDateString("en-CA")) === m);
-  const x = ult ? calcVivo(m, +ult.monto) : null;
-  const netoT = agregar(cuentan().filter(t => t.fecha >= m)).neto;
-  let h = `<div style="display:flex;justify-content:space-between;align-items:center"><strong>Makeup en vivo · ${mesTxt(m)}</strong><span class="pill g">en vivo</span></div>`;
-  if (x) {
-    h += `<div class="lbl" style="margin-top:12px">Makeup ahora</div>
-      <div class="big num ${cls(x.mk)}">${x.mk > 0 ? "+" : ""}${fmt(x.mk)}</div>
-      <div class="note" style="margin-top:0">${x.mk > 0 ? `Por encima del makeup. Si cerraras hoy: <b class="pos">${fmt(x.sj)}</b> para ti, ${fmt(x.st)} para el team.` : `Te falta ${fmt(-x.mk)} para salir del makeup.`}</div>
-      <div class="split" style="margin-top:10px">
-        <div class="mut">Caja inicio del mes</div><div class="num">${fmt(x.ci)}</div>
-        <div class="mut">Caja ahora (${new Date(ult.creado).toLocaleString("es-PE", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" })})</div><div class="num">${fmt(+ult.monto)}</div>
-        <div class="mut">Ganancia del mes según caja</div><div class="num ${cls(x.gan)}">${fmt(x.gan)}</div>
-        <div class="mut">Makeup al inicio del mes</div><div class="num ${cls(x.mi)}">${fmt(x.mi)}</div>
-        <div class="mut">Neto según torneos subidos</div><div class="num ${cls(netoT)}">${fmt(netoT)}</div>
-      </div>`;
+  const propio = verId === user.id;
+  const ref = refVivo(P, C, CM);
+  const ult = CR.find(r => new Date(r.creado).toLocaleDateString("en-CA") >= ref.desde);
+  const deal = +P.deal_jugador;
+  let h = `<div style="display:flex;justify-content:space-between;align-items:center"><strong>Makeup en vivo</strong><span class="pill g">en vivo</span></div>`;
+  if (ref.falta) {
+    h += `<p class="note">Se cerró ${mesTxt(ref.mesCierre)}. ${propio ? "Anota con cuánto quedaste en caja después del split para seguir calculando." : "El jugador aún no anotó su caja después del cierre."}</p>`;
+    if (propio) h += `<div class="row" style="margin-top:10px">
+        <div><label style="margin-top:0">Caja después del split (US$)</label><input id="vIni" type="text" inputmode="decimal" class="money" autocomplete="off"></div>
+        <div style="flex:0 0 auto"><button class="btn sm" id="vIniBtn" style="padding:11px 16px">Guardar</button></div></div>`;
   } else {
-    h += `<p class="note">${propio ? "Anota cuánto tienes en caja y te calculo el makeup al instante." : "Este jugador aún no anotó su caja este mes."}</p>`;
-  }
-  if (propio) {
-    h += `<div class="row" style="margin-top:12px">
-        <div><label style="margin-top:0">Caja ahora (US$)</label><input id="vCaja" type="text" inputmode="decimal" class="money" autocomplete="off" placeholder="Ej. 10000"></div>
+    if (ult) {
+      const caja = +ult.monto, dif = caja - ref.caja, mk = ref.makeup + dif;
+      h += `<div class="lbl" style="margin-top:12px">Makeup ahora</div>
+        <div class="big num ${cls(mk)}">${mk > 0 ? "+" : ""}${fmt(mk)}</div>
+        <div class="note" style="margin-top:0">${mk > 0 ? `Saliste del makeup. Si cerraras hoy: <b class="pos">${fmt(mk * deal / 100)}</b> para ti, ${fmt(mk - mk * deal / 100)} para el team.` : `Te falta ${fmt(-mk)} para salir del makeup.`}</div>
+        <div class="split" style="margin-top:10px">
+          <div class="mut">Caja ahora (${new Date(ult.creado).toLocaleString("es-PE", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" })})</div><div class="num">${fmt(caja)}</div>
+          <div class="mut">Caja de partida</div><div class="num">${fmt(ref.caja)}</div>
+          <div class="mut">Diferencia</div><div class="num ${cls(dif)}">${dif > 0 ? "+" : ""}${fmt(dif)}</div>
+          <div class="mut">Makeup de partida</div><div class="num ${cls(ref.makeup)}">${fmt(ref.makeup)}</div>
+        </div>`;
+    } else {
+      h += `<p class="note">Partes con <b>${fmt(ref.caja)}</b> en caja y <b class="${cls(ref.makeup)}">${fmt(ref.makeup)}</b> de makeup (${fFecha(ref.desde)}). ${propio ? "Cuando quieras, anota tu caja y te digo tu makeup en ese momento." : ""}</p>`;
+    }
+    if (propio) h += `<div class="row" style="margin-top:12px">
+        <div><label style="margin-top:0">¿Cuánto tienes ahora en caja? (US$)</label><input id="vCaja" type="text" inputmode="decimal" class="money" autocomplete="off" placeholder="Ej. 5000"></div>
         <div style="flex:0 0 auto"><button class="btn sm" id="vBtn" style="padding:11px 16px">Calcular</button></div>
       </div>
-      <div class="row" style="margin-top:2px">
-        <div><label>Caja al inicio de ${mesTxt(m)} (US$)</label><input id="vIni" type="text" inputmode="decimal" class="money" autocomplete="off" value="${ci.v ?? ""}" placeholder="¿Con cuánto empezaste el mes?"></div>
-        <div style="flex:0 0 auto"><button class="btn ghost sm" id="vIniBtn" style="padding:11px 14px">${ci.guardada ? "Cambiar" : "Guardar"}</button></div>
-      </div>
-      <p class="note">Usa la caja total de todas tus salas. Si este mes depositaste, retiraste o cobraste rakeback, el cálculo por caja lo incluye; el de torneos no.</p>`;
+      <p class="note">Makeup ahora = makeup de partida + (caja ahora − caja de partida). Si la caja baja, el makeup crece; si sube, se recupera. La caja y el makeup de partida se cambian en Ajustes.</p>`;
   }
   $("vivoCard").innerHTML = h;
   if (!propio) return;
   prepMontos($("vivoCard"));
-  $("vBtn").onclick = async () => {
+  if ($("vBtn")) $("vBtn").onclick = async () => {
     const v = numIn($("vCaja").value);
     if (isNaN(v) || v < 0) { toast("Escribe cuánto tienes en caja"); return; }
-    if (cajaInicioMes(m).v == null) { toast("Primero pon con cuánto empezaste el mes"); $("vIni").focus(); return; }
     const { error } = await sb.from("caja_registros").insert({ jugador_id: user.id, monto: v });
     if (error) { toast("Error: " + error.message); return; }
     const { data } = await sb.from("caja_registros").select("*").eq("jugador_id", user.id).order("creado", { ascending: false }).limit(60);
-    CR = data || []; pintarVivo();
+    CR = data || []; pintarResumen();
   };
-  $("vIniBtn").onclick = async () => {
+  if ($("vIniBtn")) $("vIniBtn").onclick = async () => {
     const v = numIn($("vIni").value);
     if (isNaN(v) || v < 0) { toast("Monto inválido"); return; }
-    const { error } = await sb.from("caja_mes").upsert({ jugador_id: user.id, mes: m, caja_inicio: v }, { onConflict: "jugador_id,mes" });
+    const { error } = await sb.from("caja_mes").upsert({ jugador_id: user.id, mes: ref.desde, caja_inicio: v }, { onConflict: "jugador_id,mes" });
     if (error) { toast("Error: " + error.message); return; }
     const { data } = await sb.from("caja_mes").select("*").eq("jugador_id", user.id);
-    CM = data || []; toast("Caja de inicio guardada"); pintarVivo();
+    CM = data || []; toast("Guardado"); pintarResumen();
   };
 }
 
@@ -745,8 +733,8 @@ async function pintarTeam() {
   const [tor, cie, cms, crs] = await Promise.all([
     traerTodo("torneos", q => q.select("jugador_id,fecha,costo_usd,premio_usd,reentradas")),
     sb.from("cierres_mes").select("*").order("mes").then(r => r.data || []),
-    sb.from("caja_mes").select("*").eq("mes", mAct).then(r => r.data || []),
-    sb.from("caja_registros").select("*").gte("creado", mAct).order("creado", { ascending: false }).limit(1000).then(r => r.data || [])
+    sb.from("caja_mes").select("*").then(r => r.data || []),
+    sb.from("caja_registros").select("*").order("creado", { ascending: false }).limit(1000).then(r => r.data || [])
   ]);
   let h = `<table><tr><th>Jugador</th><th>Torneos mes</th><th>ABI mes</th><th>Neto mes</th><th>ROI mes</th><th>Makeup (torneos)</th><th>Makeup en vivo</th><th>Caja actual</th><th>Deal</th></tr>`;
   const tot = { t: 0, n: 0, inv: 0, e: 0 };
@@ -758,15 +746,12 @@ async function pintarTeam() {
     const desde = ult ? addMonth(ult.mes, 1) : p.fecha_inicio;
     const mk = (ult ? +ult.makeup_siguiente : +p.makeup_inicial) + agregar(cuenta.filter(t => t.fecha >= desde)).neto;
     const caja = +p.caja_inicial + agregar(cuenta).neto;
-    // makeup en vivo: makeup al inicio del mes actual + (último registro de caja − caja de inicio del mes)
+    // makeup en vivo: makeup de partida + (último registro de caja − caja de partida)
     let vivo = "—";
-    const reg = crs.find(r => r.jugador_id === p.id && mesDe(new Date(r.creado).toLocaleDateString("en-CA")) === mAct);
-    const cmi = cms.find(r => r.jugador_id === p.id);
-    const ci = cmi ? +cmi.caja_inicio : (mesDe(p.fecha_inicio) === mAct ? +p.caja_inicial : null);
-    if (reg && ci != null) {
-      const cAct = cs.find(c => c.mes === mAct);
-      const mi = cAct ? +cAct.makeup_inicio : (ult ? +ult.makeup_siguiente : +p.makeup_inicial) + agregar(cuenta.filter(t => t.fecha >= desde && t.fecha < mAct)).neto;
-      const v = mi + (+reg.monto - ci);
+    const ref = refVivo(p, cs, cms.filter(r => r.jugador_id === p.id));
+    const reg = crs.find(r => r.jugador_id === p.id && new Date(r.creado).toLocaleDateString("en-CA") >= ref.desde);
+    if (reg && ref.caja != null) {
+      const v = ref.makeup + (+reg.monto - ref.caja);
       vivo = `<span class="${cls(v)}">${fmt0(v)}</span> <span class="mut" style="font-size:11px">${new Date(reg.creado).toLocaleString("es-PE", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" })}</span>`;
     }
     tot.t += am.torneos; tot.n += am.neto; tot.inv += am.inv; tot.e += am.entradas;
