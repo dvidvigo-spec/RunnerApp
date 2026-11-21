@@ -64,6 +64,10 @@ h3{font-size:14px;color:var(--mut);margin:18px 0 8px;text-transform:uppercase;le
 .upload{border:2px dashed var(--line);border-radius:var(--r);padding:18px;text-align:center;margin-top:14px;background:var(--bg2)}
 .upload p{color:var(--mut);font-size:13px;margin:6px 0 12px}
 .upload input{display:none}
+.upbtns{display:flex;gap:8px;justify-content:center;flex-wrap:wrap}
+.upbtns label{display:inline-block;width:auto;margin:0;font-size:15px;padding:12px 16px}
+.upbtns label.btn{color:#04110b} .upbtns label.ghost{color:var(--txt)}
+.upload.drag{border-color:var(--acc);background:#163126}
 .tbl{overflow-x:auto;border:1px solid var(--line);border-radius:var(--r);background:var(--card)}
 table{border-collapse:collapse;width:100%;font-size:13px}
 th,td{padding:9px 10px;text-align:right;white-space:nowrap;border-bottom:1px solid var(--line)}
@@ -149,9 +153,13 @@ tr.tot td{font-weight:700;background:var(--bg2)}
       <div class="card vivo" id="vivoCard"></div>
       <div class="upload" id="upBox">
         <strong>Subir resultados de PokerCraft</strong>
-        <p>El .zip que descargas de PokerCraft (o los .txt sueltos). Puedes subir el mismo día dos veces: no se duplica.</p>
-        <label class="btn" style="display:inline-block;width:auto;margin:0;color:#04110b;font-size:15px" for="fZip">Elegir archivo</label>
-        <input id="fZip" type="file" accept=".zip,.txt" multiple>
+        <p>Sube el <b>.zip</b> de PokerCraft, la <b>carpeta</b> descomprimida o los <b>.txt</b> sueltos. También puedes arrastrarlos aquí. Si subes el mismo día dos veces, no se duplica.</p>
+        <div class="upbtns">
+          <label class="btn" for="fZip">📦 Subir .zip o archivos</label>
+          <label class="btn ghost" for="fDir" id="lDir">📁 Subir carpeta</label>
+        </div>
+        <input id="fZip" type="file" multiple>
+        <input id="fDir" type="file" webkitdirectory directory multiple>
         <div id="upMsg" class="note"></div>
       </div>
       <h2>Últimos días</h2>
@@ -787,20 +795,54 @@ $("delBtn").onclick = async () => {
 };
 
 /* --- SUBIDA --- */
-$("fZip").onchange = async e => {
-  const files = [...e.target.files]; e.target.value = "";
-  if (!files.length) return;
-  const msg = $("upMsg"); msg.className = "note"; msg.textContent = "Leyendo archivos…";
-  try {
-    const textos = [];
-    for (const f of files) {
-      if (/\.zip$/i.test(f.name)) {
-        const z = await JSZip.loadAsync(f);
-        for (const ent of Object.values(z.files)) if (!ent.dir && /\.txt$/i.test(ent.name)) textos.push(await ent.async("string"));
-      } else textos.push(await f.text());
+/* --- SUBIDA: .zip, carpeta, .txt sueltos o arrastrar --- */
+async function textosDe(files) {
+  const out = [];
+  async function leerZip(blob, prof) {
+    if (!window.JSZip) throw new Error("No cargó el lector de .zip. Recarga la página o sube la carpeta descomprimida.");
+    const z = await JSZip.loadAsync(blob);
+    for (const ent of Object.values(z.files)) {
+      if (ent.dir || /(^|\/)(__MACOSX|\.)/.test(ent.name)) continue;
+      if (/\.txt$/i.test(ent.name)) out.push(await ent.async("string"));
+      else if (/\.zip$/i.test(ent.name) && prof < 2) await leerZip(await ent.async("blob"), prof + 1);
     }
+  }
+  for (const f of files) {
+    const n = f.name || "";
+    if (/\.zip$/i.test(n) || /zip/i.test(f.type)) await leerZip(f, 0);
+    else if (/\.txt$/i.test(n) || f.type === "text/plain") out.push(await f.text());
+  }
+  return out;
+}
+// archivos y carpetas arrastrados
+async function archivosArrastrados(dt) {
+  const items = [...(dt.items || [])].map(i => i.webkitGetAsEntry && i.webkitGetAsEntry()).filter(Boolean);
+  if (!items.length) return [...(dt.files || [])];
+  const out = [];
+  async function rec(e) {
+    if (e.isFile) out.push(await new Promise((ok, ko) => e.file(ok, ko)));
+    else if (e.isDirectory) {
+      const r = e.createReader(); let lote;
+      do { lote = await new Promise((ok, ko) => r.readEntries(ok, ko)); for (const x of lote) await rec(x); } while (lote.length);
+    }
+  }
+  for (const e of items) await rec(e);
+  return out;
+}
+async function subir(files) {
+  const msg = $("upMsg"); msg.className = "note";
+  if (!files.length) return;
+  msg.textContent = `Leyendo ${files.length} archivo${files.length > 1 ? "s" : ""}…`;
+  try {
+    const textos = await textosDe(files);
     const filas = textos.map(parseSummary).filter(Boolean);
-    if (!filas.length) { msg.textContent = "No encontré resúmenes de torneos en ese archivo. Debe ser el export de PokerCraft (Tournament results)."; return; }
+    if (!filas.length) {
+      msg.className = "err";
+      msg.textContent = textos.length
+        ? `Leí ${textos.length} .txt pero ninguno es un resumen de torneo de PokerCraft. Descarga "Tournament results / summaries" en PokerCraft.`
+        : `No encontré archivos .txt ni .zip en lo que subiste (${files.slice(0, 3).map(f => f.name).join(", ")}${files.length > 3 ? "…" : ""}).`;
+      return;
+    }
     msg.textContent = `Encontré ${filas.length} torneos. Convirtiendo ¥ a $…`;
     const tasas = await tasasCNY(filas.filter(f => f.moneda === "CNY").map(f => f.fecha));
     const reg = filas.map(f => {
@@ -808,23 +850,31 @@ $("fZip").onchange = async e => {
       const o = { ...f, jugador_id: user.id, tipo_cambio: tc, buyin_usd: r2(f.buyin * tc), costo_usd: r2(f.costo_total * tc), premio_usd: r2(f.premio * tc) };
       delete o.fecha; delete o.continuacion; return o;
     });
-    // quitar duplicados dentro del mismo lote
     const uniq = Object.values(Object.fromEntries(reg.map(r => [r.gg_id, r])));
     const antes = new Set(T.map(t => +t.gg_id));
     const nuevos = uniq.filter(r => !antes.has(r.gg_id)).length;
-    msg.textContent = "Guardando…";
+    msg.textContent = `Guardando ${uniq.length} torneos…`;
     for (let i = 0; i < uniq.length; i += 500) {
       const { error } = await sb.from("torneos").upsert(uniq.slice(i, i + 500), { onConflict: "jugador_id,gg_id" });
       if (error) throw error;
     }
     const a = agregar(uniq.map(r => ({ ...r, entradas: r.costo_usd > 0 ? 1 + r.reentradas : 0 })));
+    await cargarJugador(user.id);
     msg.className = "ok";
     msg.innerHTML = `✔ ${uniq.length} torneos (${nuevos} nuevos, ${uniq.length - nuevos} ya estaban). Neto del archivo: <b class="${cls(a.neto)}">${fmt(a.neto)}</b>`;
-    await cargarJugador(user.id);
   } catch (err) {
     msg.className = "err"; msg.textContent = "Error: " + (err.message || err);
   }
-};
+}
+["fZip", "fDir"].forEach(id => $(id).onchange = e => { const f = [...e.target.files]; e.target.value = ""; subir(f); });
+// el selector de carpetas no existe en iPhone/iPad
+if (/iPhone|iPad|iPod/i.test(navigator.userAgent) || !("webkitdirectory" in document.createElement("input"))) $("lDir").classList.add("hidden");
+(() => {
+  const box = $("upBox");
+  ["dragenter", "dragover"].forEach(ev => box.addEventListener(ev, e => { e.preventDefault(); box.classList.add("drag"); }));
+  ["dragleave", "drop"].forEach(ev => box.addEventListener(ev, e => { e.preventDefault(); box.classList.remove("drag"); }));
+  box.addEventListener("drop", async e => subir(await archivosArrastrados(e.dataTransfer)));
+})();
 
 init();
 </script>
